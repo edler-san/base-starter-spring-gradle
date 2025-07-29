@@ -2,7 +2,7 @@ buildscript {
     repositories {
     	mavenCentral()
 	    maven { setUrl("https://maven.vaadin.com/vaadin-prereleases") }
-			maven { setUrl("https://repo.spring.io/milestone") }
+		maven { setUrl("https://repo.spring.io/milestone") }
 		}
 }
 plugins {
@@ -28,14 +28,36 @@ configurations {
 
 dependencies {
 	implementation('com.vaadin:vaadin-spring-boot-starter')
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	testImplementation('org.springframework.boot:spring-boot-starter-test') {
-		exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
-	}
+
+    testImplementation("com.vaadin:vaadin-testbench-junit5:$vaadinVersion")
+	testRuntimeOnly("org.junit.platform:junit-platform-engine:1.12.2")
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.12.2")
 }
 
 dependencyManagement {
 	imports {
 		mavenBom "com.vaadin:vaadin-bom:$vaadinVersion"
 	}
+}
+
+
+test {
+    useJUnitPlatform()
+    filter{
+		includeTestsMatching "com.example.test.*"
+    }
+}
+
+// This task runs all tests (unit + integration) when -Pit is passed
+tasks.register('integrationTest', Test) {
+    onlyIf { project.hasProperty('it') }
+    description = 'Runs all tests including TestBench (enabled only with -Pit)'
+    group = 'verification'
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter test
+    systemProperty "com.vaadin.testbench.Parameters.headless", System.getProperty("com.vaadin.testbench.Parameters.headless", "false")
+    systemProperty "com.vaadin.testbench.Parameters.chromeOptions", System.getProperty("com.vaadin.testbench.Parameters.chromeOptions", "")
+    mustRunAfter("bootRun")
 }
