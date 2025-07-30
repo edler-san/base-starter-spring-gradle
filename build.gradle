@@ -5,6 +5,7 @@ buildscript {
 		maven { setUrl("https://repo.spring.io/milestone") }
 		}
 }
+
 plugins {
 	id 'org.springframework.boot' version '3.5.3'
 	id 'io.spring.dependency-management' version '1.1.6'
@@ -28,7 +29,6 @@ configurations {
 
 dependencies {
 	implementation('com.vaadin:vaadin-spring-boot-starter')
-
     testImplementation("com.vaadin:vaadin-testbench-junit5:$vaadinVersion")
 	testRuntimeOnly("org.junit.platform:junit-platform-engine:1.12.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.12.2")
@@ -39,7 +39,6 @@ dependencyManagement {
 		mavenBom "com.vaadin:vaadin-bom:$vaadinVersion"
 	}
 }
-
 
 test {
     useJUnitPlatform()
@@ -59,5 +58,8 @@ tasks.register('integrationTest', Test) {
     shouldRunAfter test
     systemProperty "com.vaadin.testbench.Parameters.headless", System.getProperty("com.vaadin.testbench.Parameters.headless", "false")
     systemProperty "com.vaadin.testbench.Parameters.chromeOptions", System.getProperty("com.vaadin.testbench.Parameters.chromeOptions", "")
-    mustRunAfter("bootRun")
+	doFirst {
+        println "Remember to start the application before running integration tests"
+        println "Run 'gradle bootRun' in another terminal before running these tests"
+    }
 }
