@@ -43,11 +43,19 @@ dependencyManagement {
 test {
     useJUnitPlatform()
     filter{
-		includeTestsMatching "com.example.test.*"
+        includeTestsMatching "com.example.test.*"
     }
 }
 
-// This task runs all tests (unit + integration) when -Pit is passed
+// Task to build the jar first
+tasks.register('buildAppJar') {
+    dependsOn 'bootJar'
+    doLast {
+        println "Application JAR built"
+    }
+}
+
+// Integration test task that starts and stops the app
 tasks.register('integrationTest', Test) {
     onlyIf { project.hasProperty('it') }
     description = 'Runs all tests including TestBench (enabled only with -Pit)'
@@ -56,10 +64,59 @@ tasks.register('integrationTest', Test) {
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     shouldRunAfter test
+    dependsOn 'buildAppJar'
+    
+    def appProcess
+    
+    doFirst {
+        println "Starting application for integration tests..."
+        
+        def jarFile = "${buildDir}/libs/${project.name}.jar"
+        def processBuilder = new ProcessBuilder()
+            .command('java', '-jar', jarFile, '--server.port=8080', '--spring.profiles.active=test')
+            .directory(project.projectDir)
+        println "Starting application with command: ${processBuilder.command().join(' ')}"
+        appProcess = processBuilder.start()
+		println "Application started with PID: ${appProcess.pid()}"
+        
+        // Wait for app to be ready
+        def maxWaitTime = 120000 // 120 seconds
+        def waitInterval = 3000 // 3 second
+        def totalWait = 0
+        
+        while (totalWait < maxWaitTime) {
+            try {
+                def connection = new URL('http://localhost:8080').openConnection()
+                connection.requestMethod = 'GET'
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                
+                if (connection.responseCode == 200) {
+                    println "Application is ready on http://localhost:8080"
+                    break
+                }
+            } catch (Exception e) {
+                // Application not ready yet
+            }
+            
+            Thread.sleep(waitInterval)
+            totalWait += waitInterval
+            
+            if (totalWait >= maxWaitTime) {
+                throw new GradleException("Application failed to start within ${maxWaitTime}ms")
+            }
+        }
+    }
+    
+    doLast {
+        if (appProcess != null) {
+            println "Stopping application..."
+            appProcess.destroy()
+            appProcess.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+        }
+    }
+    
     systemProperty "com.vaadin.testbench.Parameters.headless", System.getProperty("com.vaadin.testbench.Parameters.headless", "false")
     systemProperty "com.vaadin.testbench.Parameters.chromeOptions", System.getProperty("com.vaadin.testbench.Parameters.chromeOptions", "")
-	doFirst {
-        println "Remember to start the application before running integration tests"
-        println "Run 'gradle bootRun' in another terminal before running these tests"
-    }
+    systemProperty "com.vaadin.testbench.Parameters.baseUrl", "http://localhost:8080"
 }
